@@ -10,8 +10,8 @@ Ensemble gender classifier — three complementary sources:
 Weights are renormalised at inference time if a source returns no signal for a name.
 
 Final labels:
-  P(female) >= 0.80  → "Female"
-  P(female) <= 0.20  → "Male"
+  P(female) >= 0.70  → "Female"
+  P(female) <= 0.30  → "Male"
   otherwise          → "Uncertain"
 """
 
@@ -26,16 +26,17 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 
-SSA_DIR = Path(__file__).parent.parent / "data" / "gender" / "ssa"
+SSA_DIR     = Path(__file__).parent.parent / "data" / "gender" / "ssa"
+ONTARIO_DIR = Path(__file__).parent.parent / "data" / "gender" / "ontario"
 MODEL_CACHE = Path(__file__).parent.parent / "data" / "gender" / "char_model.pkl"
 
 BIRTH_YEAR_MIN = 1950
 BIRTH_YEAR_MAX = 2003
 
-FEMALE_THRESHOLD = 0.80
-MALE_THRESHOLD = 0.20
+FEMALE_THRESHOLD = 0.70
+MALE_THRESHOLD = 0.30
 
-_BASE_WEIGHTS = {"ssa": 0.60, "char_model": 0.30, "hf": 0.10}
+_BASE_WEIGHTS = {"ssa": 0.50, "ontario": 0.20, "char_model": 0.20, "hf": 0.10}
 
 
 # ---------------------------------------------------------------------------
@@ -71,7 +72,38 @@ def _build_ssa_lookup() -> dict[str, float]:
 
 
 # ---------------------------------------------------------------------------
-# Source 2: Character n-gram logistic regression trained on SSA data
+# Source 2: Ontario baby names lookup
+# ---------------------------------------------------------------------------
+
+def _build_ontario_lookup() -> dict[str, float]:
+    """Return name → P(female) from Ontario birth registration data (1950-2003)."""
+    female_path = ONTARIO_DIR / "baby_names_female.csv"
+    male_path   = ONTARIO_DIR / "baby_names_male.csv"
+
+    if not female_path.exists() or not male_path.exists():
+        return {}
+
+    def _load(path: Path) -> pd.Series:
+        raw = pd.read_csv(path, dtype=str)
+        raw.columns = ["year", "name", "freq"]
+        raw["year"] = pd.to_numeric(raw["year"], errors="coerce")
+        raw["freq"] = pd.to_numeric(raw["freq"], errors="coerce").fillna(0)
+        raw = raw[(raw["year"] >= BIRTH_YEAR_MIN) & (raw["year"] <= BIRTH_YEAR_MAX)]
+        raw["name"] = raw["name"].str.title()
+        return raw.groupby("name")["freq"].sum()
+
+    female_counts = _load(female_path)
+    male_counts   = _load(male_path)
+
+    all_names = female_counts.index.union(male_counts.index)
+    f = female_counts.reindex(all_names, fill_value=0)
+    m = male_counts.reindex(all_names, fill_value=0)
+    total = f + m
+    return (f / total)[total > 0].to_dict()
+
+
+# ---------------------------------------------------------------------------
+# Source 3: Character n-gram logistic regression trained on SSA data
 # ---------------------------------------------------------------------------
 
 def _spaced(name: str) -> str:
@@ -161,6 +193,10 @@ class GenderClassifier:
         self._ssa = _build_ssa_lookup()
         print(f"  {len(self._ssa):,} unique names loaded from SSA data.")
 
+        print("Loading Ontario lookup...")
+        self._ontario = _build_ontario_lookup()
+        print(f"  {len(self._ontario):,} unique names loaded from Ontario data.")
+
         print("Loading / training char-gram model...")
         self._char_model = _load_or_train_char_model(self._ssa)
         print(f"  Char model: {'OK' if self._char_model else 'unavailable (no SSA data)'}")
@@ -177,6 +213,9 @@ class GenderClassifier:
 
     def _ssa_prob(self, name: str) -> Optional[float]:
         return self._ssa.get(name.title())
+
+    def _ontario_prob(self, name: str) -> Optional[float]:
+        return self._ontario.get(name.title())
 
     def _char_prob(self, name: str) -> Optional[float]:
         if self._char_model is None:
@@ -196,9 +235,10 @@ class GenderClassifier:
     def predict_proba(self, name: str) -> Optional[float]:
         """Weighted P(female) for one first name, or None if no source has any signal."""
         signals = {
-            "ssa": self._ssa_prob(name),
+            "ssa":        self._ssa_prob(name),
+            "ontario":    self._ontario_prob(name),
             "char_model": self._char_prob(name),
-            "hf": self._hf_prob(name),
+            "hf":         self._hf_prob(name),
         }
         available = {k: v for k, v in signals.items() if v is not None}
         if not available:

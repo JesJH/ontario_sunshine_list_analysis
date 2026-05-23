@@ -42,17 +42,19 @@ def main():
     print("Training char-gram model...")
     model = _train_char_model(ssa)
 
-    print("\n5-fold cross-validation accuracy:")
-    scores = cross_val_score(model, names, labels, cv=5, scoring="accuracy",
-                             fit_params={"clf__sample_weight": weights})
+    print("\n5-fold cross-validation accuracy (unweighted, for reference):")
+    scores = cross_val_score(model, names, labels, cv=5, scoring="accuracy")
     print(f"  {scores.round(4)} → mean {scores.mean():.4f} ± {scores.std():.4f}")
 
-    print("\nExample predictions:")
+    # Show ensemble predictions (SSA lookup + char model), not char model alone
+    print("\nExample predictions (full ensemble — SSA lookup + char model):")
+    from src.gender_inference import GenderClassifier
+    clf = GenderClassifier()
     test_names = ["Emma", "James", "Alex", "Priya", "Wei", "Jordan", "Fatima", "Michael"]
     for name in test_names:
-        p = model.predict_proba([_spaced(name)])[0][1]
-        label = "Female" if p >= 0.80 else ("Male" if p <= 0.20 else "Uncertain")
-        print(f"  {name:<12} P(female)={p:.3f}  → {label}")
+        label, conf = clf.classify(name)
+        p = clf.predict_proba(name)
+        print(f"  {name:<12} P(female)={p:.3f}  conf={conf:.3f}  → {label}")
 
     MODEL_CACHE.parent.mkdir(parents=True, exist_ok=True)
     joblib.dump(model, MODEL_CACHE)

@@ -18,12 +18,82 @@ _COLUMN_MAP = {
     "sector": "sector",
     "employer": "employer",
     "job title": "job_title",
+    "jobtitle": "job_title",
 }
 
 
 def _normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
     df.columns = [_COLUMN_MAP.get(c.strip().lower(), c.strip().lower()) for c in df.columns]
     return df
+
+
+def _normalize_sector(series: pd.Series) -> pd.Series:
+    """Collapse sector name variants that differ only in punctuation or spelling across years."""
+    s = (
+        series
+        .str.strip()
+        .str.rstrip("*")
+        .str.strip()
+        .str.replace("–", "-", regex=False)
+        .str.replace(" & ", " and ", regex=False)
+        .str.replace(r"\s+", " ", regex=True)
+        .str.title()                            # consistent case across years
+    )
+    # Collapse all "Seconded (...)" variants into a single category
+    s = s.where(~s.str.startswith("Seconded"), other="Seconded")
+    return s
+
+
+_TITLE_CANONICAL = {
+    # Word-order variants without comma (comma variants handled by inversion regex below)
+    "teacher elementary":  "elementary teacher",
+    "teacher secondary":   "secondary teacher",
+    "teacher primary":     "primary teacher",
+    "nurse registered":    "registered nurse",
+    "constable police":    "police constable",
+}
+
+
+def _normalize_job_title(series: pd.Series) -> pd.Series:
+    """
+    Produce a normalized job title for clustering and grouping.
+
+    Steps applied in order:
+    1. Lowercase, strip, collapse whitespace, normalize spaces around slashes
+    2. Strip bilingual French suffixes after `/` (identified by accented characters)
+    3. Invert HR comma-convention: "Nurse, Registered" -> "registered nurse"
+    4. Apply canonical mapping for remaining word-order variants
+    """
+    s = (
+        series.astype(str)
+        .str.lower()
+        .str.strip()
+        .str.replace(r"\s+", " ", regex=True)
+        .str.replace(r"\s*/\s*", "/", regex=True)
+    )
+    # Strip French bilingual suffix: "english/french" -> "english"
+    # Triggered when the post-slash segment contains an accented character
+    s = s.str.replace(r"/[^/]*[àâäéèêëîïôùûüçœæ][^/]*$", "", regex=True).str.strip()
+
+    # Invert HR comma-convention: "Profession, Modifier" -> "modifier profession"
+    mask = s.str.match(r"^.+,\s+\w+(\s+\w+){0,2}$")
+    s = s.copy()
+    s[mask] = s[mask].str.replace(r"^(.+),\s+(.+)$", r"\2 \1", regex=True)
+
+    # Apply canonical mapping for known word-order variants
+    s = s.map(lambda t: _TITLE_CANONICAL.get(t, t))
+    return s
+
+
+def _normalize_employer(series: pd.Series) -> pd.Series:
+    """Collapse employer name variants that differ in case or punctuation across years."""
+    return (
+        series
+        .str.strip()
+        .str.replace("–", "-", regex=False)   # em-dash → hyphen
+        .str.replace(r"\s+", " ", regex=True) # collapse double spaces
+        .str.title()                           # consistent title case: "of" == "Of"
+    )
 
 
 def _clean_salary(series: pd.Series) -> pd.Series:
@@ -66,6 +136,9 @@ def load_all() -> pd.DataFrame:
 
         for col in ("last_name", "first_name", "sector", "employer", "job_title"):
             df[col] = df[col].astype(str).str.strip()
+        df["sector"]        = _normalize_sector(df["sector"])
+        df["employer"]      = _normalize_employer(df["employer"])
+        df["job_title_norm"] = _normalize_job_title(df["job_title"])
 
         df["first_name_clean"] = df["first_name"].apply(_extract_first_name)
 

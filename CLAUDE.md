@@ -5,7 +5,7 @@ Analyze Ontario Sunshine List salary data (2017–2025) to detect and characteri
 
 ## What Has Been Built
 - `src/data_loader.py` — loads and normalizes all 9 CSVs (handles schema differences across years), cleans $ formatting, extracts first given name
-- `src/gender_inference.py` — ensemble gender classifier: SSA lookup (60%) + char n-gram logistic regression trained on SSA data (30%) + optional HuggingFace model (10%)
+- `src/gender_inference.py` — ensemble gender classifier: SSA lookup (50%) + Ontario baby names lookup (20%) + char n-gram logistic regression trained on SSA data (20%) + optional HuggingFace model (10%)
 - `scripts/download_gender_data.py` — downloads SSA baby names (birth years 1950–2003) + NLTK corpus
 - `scripts/train_gender_model.py` — trains and caches the char-gram model, prints cross-val accuracy
 - `analysis.ipynb` — runner notebook; Sections 1 (data load) and 2 (gender inference) are wired up; Sections 3–5 are stubs
@@ -36,7 +36,7 @@ Data CSVs are not in git — copy the `data/` folder manually or re-download fro
 | NLP clustering | K-Means (primary) + HDBSCAN (comparison). K via elbow + silhouette + WCSS/BCSS + bootstrap stability (ARI). ~100 clusters target. Human review layer. |
 | Seniority proxy | Years on list + salary growth rate + cluster transitions |
 | Identity resolution | Normalized name + employer as primary key, fuzzy fallback, flag ambiguous |
-| Data scope | 2017–2025 CSVs from Ontario government open data |
+| Data scope | 2016–2025 CSVs from Ontario government open data |
 
 ## Key Caveats to Document
 - No seniority/experience field — only raw gaps and partially-controlled gaps are measurable
