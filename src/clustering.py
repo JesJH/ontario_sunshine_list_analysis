@@ -199,10 +199,7 @@ def bootstrap_ari(
         )
         sub_labels_all = np.empty(n, dtype=int)
         sub_labels_all[mask] = sub_km.fit_predict(embeddings[mask])
-
-        # assign held-out to nearest subsampled centroid
-        diffs = embeddings[~mask, None, :] - sub_km.cluster_centers_[None, :, :]
-        sub_labels_all[~mask] = np.linalg.norm(diffs, axis=2).argmin(axis=1)
+        sub_labels_all[~mask] = sub_km.predict(embeddings[~mask])
 
         aris.append(adjusted_rand_score(ref_labels, sub_labels_all))
 
