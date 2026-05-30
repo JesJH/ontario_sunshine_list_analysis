@@ -16,7 +16,7 @@ Analyze Ontario Sunshine List salary data (2016–2025) to detect and characteri
 - `scripts/train_gender_model.py` — trains and caches the char-gram model
 
 ### Notebook (`analysis.ipynb`) — all sections wired up
-- **Section 1**: Data load, salary distribution, record count by year
+- **Section 1**: Data load, salary distribution, record count by year; sector median trend lines + total growth bar chart; YoY % change by sector; Judiciary deep-dive (audit table of individual 2019–2021 salaries, scatter plot coloured by job title, sustained vs one-time raise classifier)
 - **Section 2**: Gender inference, threshold sensitivity, Uncertain breakdown, manual override cell
 - **Section 2b**: Gender EDA — KDE salary distributions, median trend, salary decile chart, sector chart, employer imbalance table, takeaways commentary
 - **Section 3**: NLP clustering — embeddings (cached), K-selection sweep, bootstrap ARI, K-Means + HDBSCAN, cluster human-review table
@@ -57,6 +57,9 @@ Run top to bottom. Slow cells (first run only):
 - Section 5 identity resolution + transitions: a few minutes on 2.4M records
 
 `gap_df` (Female vs Male, used by waterfall/female-favoring cells) is set in the Section 4 gap cell. `gap_fm`, `gap_um`, `gap_fu` are all available after that cell runs. `review` (cluster summary) must be computed in Section 3 before Section 4 cells run.
+
+## Known Issues / Pending
+- `applymap` → `map` rename: pandas 2.1+ removed `DataFrame.applymap`. Affects 3 cells in the notebook (sect1_sector_trend, sect1_sector_yoy, and one Section 5 cell). Fix by replacing `.applymap(` with `.map(` in those cells.
 
 ## Key Caveats
 - No seniority/experience field — gap conflates discrimination with tenure differences
