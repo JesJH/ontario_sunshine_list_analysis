@@ -33,7 +33,7 @@ All tools are free and run locally — no external APIs.
 - **The gap is not closing over time in most job clusters.** Tracking the same individuals year over year (linked via name and employer), most clusters show a stable or widening Female–Male salary gap across 2016–2025. The flat aggregate female share combined with a persistent within-job premium that has not narrowed suggests the structural drivers of the gap are not self-correcting under current conditions.
 - **Salary growth rates and promotion proxies reveal where the gap compounds.** Even conditional on being on the Sunshine List, year-over-year salary growth rates and upward cluster transitions (a proxy for promotions) differ by gender group. Groups with lower starting salaries who also receive smaller raises and fewer promotions face compounding disadvantage over time — the gap in any given year understates the cumulative career effect.
 
-See [METHODOLOGY.md](METHODOLOGY.md) for full details on data processing, gender inference, clustering, statistical tests, and longitudinal analysis.
+See [methodology.md](docs/methodology.md) for full details on data processing, gender inference, clustering, statistical tests, and longitudinal analysis.
 
 ---
 
